@@ -339,7 +339,8 @@ void VulkanDriver::destroyRenderPrimitive(Handle<HwRenderPrimitive> rph) {
 void VulkanDriver::createVertexBufferR(Handle<HwVertexBuffer> vbh, uint8_t bufferCount,
         uint8_t attributeCount, uint32_t elementCount, AttributeArray attributes) {
     auto vertexBuffer = mResourceAllocator.construct<VulkanVertexBuffer>(vbh, mContext, mStagePool,
-            &mResourceAllocator, bufferCount, attributeCount, elementCount, attributes);
+            &mPipelineInfoCache, &mResourceAllocator, bufferCount, attributeCount, elementCount,
+            attributes);
     mResourceManager.acquire(vertexBuffer);
 }
 
@@ -370,7 +371,7 @@ void VulkanDriver::destroyIndexBuffer(Handle<HwIndexBuffer> ibh) {
 void VulkanDriver::createBufferObjectR(Handle<HwBufferObject> boh, uint32_t byteCount,
         BufferObjectBinding bindingType, BufferUsage usage) {
     auto bufferObject = mResourceAllocator.construct<VulkanBufferObject>(boh, mAllocator,
-            mStagePool, byteCount, bindingType, usage);
+            mStagePool, byteCount, bindingType);
     mResourceManager.acquire(bufferObject);
 }
 
@@ -1554,50 +1555,10 @@ void VulkanDriver::draw(PipelineState pipelineState, Handle<HwRenderPrimitive> r
     mPipelineCache.setCurrentRasterState(vkraster);
 
     // Declare fixed-size arrays that get passed to the pipeCache and to vkCmdBindVertexBuffers.
-    VulkanPipelineCache::VertexArray varray = {};
-    VkBuffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
-    VkDeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
-
-    // For each attribute, append to each of the above lists.
-    const uint32_t bufferCount = prim.vertexBuffer->attributes.size();
-    for (uint32_t attribIndex = 0; attribIndex < bufferCount; attribIndex++) {
-        Attribute attrib = prim.vertexBuffer->attributes[attribIndex];
-
-        const bool isInteger = attrib.flags & Attribute::FLAG_INTEGER_TARGET;
-        const bool isNormalized = attrib.flags & Attribute::FLAG_NORMALIZED;
-
-        VkFormat vkformat = getVkFormat(attrib.type, isNormalized, isInteger);
-
-        // HACK: Re-use the positions buffer as a dummy buffer for disabled attributes. Filament's
-        // vertex shaders declare all attributes as either vec4 or uvec4 (the latter for bone
-        // indices), and positions are always at least 32 bits per element. Therefore we can assign
-        // a dummy type of either R8G8B8A8_UINT or R8G8B8A8_SNORM, depending on whether the shader
-        // expects to receive floats or ints.
-        if (attrib.buffer == Attribute::BUFFER_UNUSED) {
-            vkformat = isInteger ? VK_FORMAT_R8G8B8A8_UINT : VK_FORMAT_R8G8B8A8_SNORM;
-            attrib = prim.vertexBuffer->attributes[0];
-        }
-
-        const VulkanBuffer* buffer = prim.vertexBuffer->buffers[attrib.buffer];
-
-        // If the vertex buffer is missing a constituent buffer object, skip the draw call.
-        // There is no need to emit an error message because this is not explicitly forbidden.
-        if (buffer == nullptr) {
-            return;
-        }
-
-        buffers[attribIndex] = buffer->getGpuBuffer();
-        offsets[attribIndex] = attrib.offset;
-        varray.attributes[attribIndex] = {
-            .location = attribIndex, // matches the GLSL layout specifier
-            .binding = attribIndex,  // matches the position within vkCmdBindVertexBuffers
-            .format = vkformat,
-        };
-        varray.buffers[attribIndex] = {
-            .binding = attribIndex,
-            .stride = attrib.stride,
-        };
-    }
+    uint32_t const bufferCount = prim.vertexBuffer->attributes.size();
+    VulkanPipelineCache::VertexArray const& varray =  prim.vertexBuffer->getVarray();
+    VkBuffer const* buffers = prim.vertexBuffer->getVkBuffers();
+    VkDeviceSize const* offsets = prim.vertexBuffer->getOffsets();
 
     // Push state changes to the VulkanPipelineCache instance. This is fast and does not make VK calls.
     mPipelineCache.bindProgram(*program);

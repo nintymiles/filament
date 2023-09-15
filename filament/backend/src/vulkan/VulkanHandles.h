@@ -22,6 +22,7 @@
 
 #include "VulkanBuffer.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanPipelineInfoCache.h"
 #include "VulkanResources.h"
 #include "VulkanSwapChain.h"
 #include "VulkanTexture.h"
@@ -91,14 +92,29 @@ struct VulkanBufferObject;
 
 struct VulkanVertexBuffer : public HwVertexBuffer, VulkanResource {
     VulkanVertexBuffer(VulkanContext& context, VulkanStagePool& stagePool,
-            VulkanResourceAllocator* allocator, uint8_t bufferCount, uint8_t attributeCount,
-            uint32_t elementCount, AttributeArray const& attributes);
+            VulkanPipelineInfoCache* infoCache, VulkanResourceAllocator* allocator,
+            uint8_t bufferCount, uint8_t attributeCount, uint32_t elementCount,
+            AttributeArray const& attributes);
+
+    ~VulkanVertexBuffer();
 
     void setBuffer(VulkanBufferObject* bufferObject, uint32_t index);
 
-    utils::FixedCapacityVector<VulkanBuffer const*> buffers;
+    inline VulkanPipelineCache::VertexArray const& getVarray() const {
+        return mInfo->varray;
+    }
+
+    inline VkBuffer const* getVkBuffers() const {
+        return mInfo->vkbuffers;
+    }
+
+    inline VkDeviceSize const* getOffsets() const {
+        return mInfo->offsets;
+    }
 
 private:
+    VulkanPipelineInfoCache* mInfoCache;
+    VulkanPipelineInfoCache::VertexBufferInfo* mInfo;
     FixedSizeVulkanResourceManager mResources;
 };
 
@@ -116,7 +132,7 @@ struct VulkanIndexBuffer : public HwIndexBuffer, VulkanResource {
 
 struct VulkanBufferObject : public HwBufferObject, VulkanResource {
     VulkanBufferObject(VmaAllocator allocator, VulkanStagePool& stagePool, uint32_t byteCount,
-            BufferObjectBinding bindingType, BufferUsage usage);
+            BufferObjectBinding bindingType);
 
     VulkanBuffer buffer;
     const BufferObjectBinding bindingType;

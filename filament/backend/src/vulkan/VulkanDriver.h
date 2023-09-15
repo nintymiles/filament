@@ -23,6 +23,7 @@
 #include "VulkanFboCache.h"
 #include "VulkanHandles.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanPipelineInfoCache.h"
 #include "VulkanReadPixels.h"
 #include "VulkanResourceAllocator.h"
 #include "VulkanSamplerCache.h"
@@ -106,6 +107,7 @@ private:
     VulkanThreadSafeResourceManager mThreadSafeResourceManager;
 
     VulkanPipelineCache mPipelineCache;
+    VulkanPipelineInfoCache mPipelineInfoCache;
     VulkanStagePool mStagePool;
     VulkanFboCache mFramebufferCache;
     VulkanSamplerCache mSamplerCache;
